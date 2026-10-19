@@ -2,6 +2,8 @@
 
 A Claude Code mod that adds a **Work** pane: the agents of the session as an org chart of cards, the tasks with what blocks them, and the git worktrees with their pull requests.
 
+![The Work pane with demo data](docs/panel.svg)
+
 ## What it shows
 
 **Agents.** A card for the main session, joined by connector lines to a card per agent, with subagents hanging under their parent. Each card has:

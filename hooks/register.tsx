@@ -399,10 +399,14 @@ export const register: Register = on => {
         paddingX={1}
       >
         <Box justifyContent="space-between">
-          <Text bold dimColor={badge.isQuiet} wrap="truncate-end">
-            {title}
-          </Text>
-          <Text color={badge.color}> {badge.text}</Text>
+          <Box flexShrink={1}>
+            <Text bold dimColor={badge.isQuiet} wrap="truncate-end">
+              {title}
+            </Text>
+          </Box>
+          <Box flexShrink={0}>
+            <Text color={badge.color}> {badge.text}</Text>
+          </Box>
         </Box>
         {lines.map(line => (
           <Text color={line.color} dimColor={!line.color} wrap="truncate-end">
@@ -431,16 +435,18 @@ export const register: Register = on => {
     }
 
     const metrics = (s: AgentStats | undefined): Line[] => {
-      if (!s || s.turns + s.tools === 0) return []
+      if (!s) return []
+      // A teammate in its own process reports tool calls here but no usage.
+      const total = s.inputTokens + s.outputTokens
       const parts = [
-        money(s.costUsd),
-        `${tokens(s.inputTokens + s.outputTokens)} tok`,
-        `ctx ${tokens(s.contextTokens)}`,
-        duration(s.totalMs),
-        `${s.tools} tools`,
-      ]
-      if (s.files.length > 0) parts.push(`${s.files.length} files`)
-      return [{ text: parts.join(' · ') }]
+        s.costUsd > 0 && money(s.costUsd),
+        total > 0 && `${tokens(total)} tok`,
+        s.contextTokens > 0 && `ctx ${tokens(s.contextTokens)}`,
+        s.totalMs > 0 && duration(s.totalMs),
+        s.tools > 0 && `${s.tools} tools`,
+        s.files.length > 0 && `${s.files.length} files`,
+      ].filter(Boolean)
+      return parts.length > 0 ? [{ text: parts.join(' · ') }] : []
     }
 
     const activity = (s: AgentStats | undefined, isLive: boolean): Line[] => {
