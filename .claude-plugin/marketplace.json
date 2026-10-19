@@ -1,0 +1,5 @@
+{
+  "name": "mariano-mods",
+  "owner": { "name": "Mariano Aguero" },
+  "plugins": [{ "name": "work-graph", "source": "./" }]
+}
