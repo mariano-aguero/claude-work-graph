@@ -155,3 +155,21 @@ test('main card follows the current worktree, hidden dirty trees are not called 
   expect(await ui.find({ type: 'Text', text: /\+ 2 more, 2 with changes/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('work_status gives the model agents, open blockers and worktrees', async ($, on) => {
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('agent.list', () => ({
+    value: [{ id: 'a1', name: 'coder', description: 'x', type: 'general-purpose', status: 'running' }],
+  }))
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: TASKS } }))
+  on('process.run', ($, e) => {
+    const stdout = e.argv.includes('list') ? PORCELAIN : e.argv.includes('/r/wt/feature') ? ' M a.ts\n' : ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+
+  const ran = await $.tool.call({ tool: 'mcp__work-graph__work_status' })
+  const status = JSON.parse(ran.text!)
+  expect(status.agents[0]).toMatchObject({ name: 'coder', status: 'running' })
+  expect(status.tasks.find((t: { id: string }) => t.id === '2').waitingOn).toEqual(['1'])
+  expect(status.worktrees.find((t: { branch: string }) => t.branch === 'feature').changedFiles).toBe(1)
+})

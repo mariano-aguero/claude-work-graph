@@ -20,6 +20,8 @@ The header carries the agent counts and the session cost as `/cost` reports it.
 
 **Worktrees.** The worktrees with uncommitted changes or a branch of their own, with the number of changed files and the branch's pull request: number, open, draft, merged or closed, and CI checks. Detached and clean worktrees are folded into one line.
 
+**For the model.** The mod registers a `work_status` tool that returns the same picture as JSON: agents with their status, branch, current tool and PR; tasks with the open tasks they wait on; worktrees with their changed files, PR and checks. The main session and its agents can call it before taking a task or a worktree, to see what is blocked and what another agent already holds.
+
 ## Install
 
 At the prompt of a Claude Code session:

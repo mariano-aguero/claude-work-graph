@@ -14,6 +14,7 @@ const GAP = 1
 const MAX_TREES = 8
 const MAX_FILES = 50
 const MAIN = 'main'
+const STATUS_TOOL = 'work_status'
 
 const tasks = atom({ plugin: 'work-graph', key: 'tasks' } as const, [])
 const agents = atom({ plugin: 'work-graph', key: 'agents' } as const, [])
@@ -184,6 +185,41 @@ function refreshAll($: EngineInterface) {
   ])
 }
 
+// What the pane shows, as data for the model and its agents. PRs come from the
+// last minute's poll; a gh call here would hold up the turn.
+async function workStatus($: EngineInterface) {
+  await Promise.allSettled([refreshTasks($), refreshAgents($), refreshWorktrees($)])
+  const taskList = await read($, tasks)
+  const byId = new Map(taskList.map(t => [t.id, t]))
+  const allStats = await read($, stats)
+  return {
+    agents: (await read($, agents)).map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      status: a.status,
+      parentId: a.parentId,
+      branch: a.branch,
+      doing: allStats[a.id]?.currentTool,
+      pr: allStats[a.id]?.prUrl,
+    })),
+    tasks: taskList.map(t => ({
+      id: t.id,
+      subject: t.subject,
+      status: t.status,
+      owner: t.owner,
+      waitingOn: t.blockedBy.filter(id => byId.has(id) && byId.get(id)!.status !== 'completed'),
+    })),
+    worktrees: (await read($, worktrees)).map(t => ({
+      path: t.path,
+      branch: t.branch,
+      changedFiles: t.dirty,
+      isCurrent: t.isCurrent,
+      pr: t.pr,
+    })),
+  }
+}
+
 function toolLabel(e: { tool: string } & Record<string, unknown>) {
   const target = e.file_path ?? e.command ?? e.pattern ?? e.description ?? e.url
   if (typeof target !== 'string') return e.tool
@@ -315,6 +351,15 @@ export const register: Register = on => {
       name: 'work',
       description: 'Show agents, tasks with their blockers, worktrees and PRs in a pane',
     })
+    await $.tool.register({
+      name: STATUS_TOOL,
+      description:
+        'The work of this session as JSON: each agent with its status, branch, current tool and PR; ' +
+        'each task with the open tasks it waits on; each git worktree with its changed files, PR and CI checks. ' +
+        'Call it before taking a task or a worktree, to see what is blocked and what another agent already holds.',
+      inputSchema: { type: 'object', properties: {} },
+      isDeferred: false,
+    })
     void refreshAll($).then(() => $.ui.open(OPEN))
     $.clock.every(POLL_MS, () => {
       void refreshAgents($)
@@ -331,6 +376,11 @@ export const register: Register = on => {
     const opened = await $.ui.open(OPEN)
 
     return { text: opened.isPlaced ? 'Work pane opened.' : `Work pane waiting: ${opened.reason}` }
+  })
+
+  on('tool.call', { tool: `mcp__work-graph__${STATUS_TOOL}` }, async $ => {
+    const status = await workStatus($)
+    return { result: status, text: JSON.stringify(status), isReadOnly: true }
   })
 
   on('turn.step', async function* ($, e, next) {
