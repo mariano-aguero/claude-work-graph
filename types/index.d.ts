@@ -22,7 +22,7 @@ export type PullRequest = {
   isDraft: boolean
   checks: 'passing' | 'failing' | 'pending' | 'none'
 }
-export type Worktree = { path: string; branch: string; dirty: number; pr?: PullRequest }
+export type Worktree = { path: string; branch: string; dirty: number; isCurrent: boolean; pr?: PullRequest }
 // What one loop (the main session or one agent) has done since the mod loaded.
 export type AgentStats = {
   model?: string

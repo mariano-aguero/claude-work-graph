@@ -80,7 +80,8 @@ async function refreshWorktrees($: EngineInterface) {
   const { exitCode, stdout } = await $.process.run(['git', 'worktree', 'list', '--porcelain'])
   if (exitCode !== 0) return
 
-  const prs = new Map((await read($, worktrees)).map(t => [t.branch, t.pr]))
+  const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'])
+  const current = top.stdout.trim()
   const found: Worktree[] = []
   for (const block of stdout.trim().split('\n\n')) {
     const path = block.match(/^worktree (.+)$/m)?.[1]
@@ -88,9 +89,13 @@ async function refreshWorktrees($: EngineInterface) {
     const branch = block.match(/^branch refs\/heads\/(.+)$/m)?.[1] ?? 'detached'
     const status = await $.process.run(['git', '-C', path, 'status', '--porcelain'])
     const dirty = status.stdout.split('\n').filter(Boolean).length
-    found.push({ path, branch, dirty, pr: prs.get(branch) })
+    found.push({ path, branch, dirty, isCurrent: path === current })
   }
-  await update($, worktrees, () => found)
+  // PRs are read at write time, so a PR refresh that landed during the scan is kept.
+  await update($, worktrees, list => {
+    const prs = new Map(list.map(t => [t.branch, t.pr]))
+    return found.map(t => ({ ...t, pr: prs.get(t.branch) }))
+  })
 }
 
 type GhPr = {
@@ -120,9 +125,17 @@ async function refreshPullRequests($: EngineInterface) {
   })
   if (ran?.exitCode !== 0) return
 
+  let listed: GhPr[]
+  try {
+    listed = JSON.parse(ran.stdout)
+  } catch (error) {
+    $.ui.log(`work-graph: gh pr list returned bad JSON: ${String(error)}`, { to: 'debug' })
+    return
+  }
+
   // gh lists newest first, so the first PR seen for a branch is the current one.
   const byBranch = new Map<string, PullRequest>()
-  for (const pr of JSON.parse(ran.stdout) as GhPr[]) {
+  for (const pr of listed) {
     if (byBranch.has(pr.headRefName)) continue
     byBranch.set(pr.headRefName, {
       number: pr.number,
@@ -496,7 +509,7 @@ export const register: Register = on => {
     const waiting = agentList.filter(a => a.status === 'waiting').length
 
     const mainStats = allStats[MAIN]
-    const mainTree = treeList[0]
+    const mainTree = treeList.find(t => t.isCurrent) ?? treeList[0]
     const mainLines: Line[] = [{ text: modelName(mainStats?.model) ?? 'this session' }]
     mainLines.push(...activity(mainStats, true))
     const sessionParts = [
@@ -541,6 +554,10 @@ export const register: Register = on => {
       .filter(t => t.dirty > 0 || t.branch !== 'detached')
       .sort((a, b) => b.dirty - a.dirty || Number(Boolean(b.pr)) - Number(Boolean(a.pr)))
       .slice(0, MAX_TREES)
+    const hiddenTrees = treeList.filter(t => !shownTrees.includes(t))
+    const hiddenDirty = hiddenTrees.filter(t => t.dirty > 0).length
+    const isHiddenDetached = hiddenTrees.every(t => t.branch === 'detached')
+    const hiddenNote = hiddenDirty > 0 ? `${hiddenDirty} with changes` : isHiddenDetached ? 'detached and clean' : 'clean'
     const dirtyTrees = treeList.filter(t => t.dirty > 0).length
     const openPrs = treeList.filter(t => t.pr?.state === 'OPEN').length
     const root = commonDir(treeList.map(t => t.path))
@@ -613,8 +630,10 @@ export const register: Register = on => {
                 <Text dimColor>  {relative(tree.path, root)}</Text>
               </Text>
             ))}
-            {treeList.length > shownTrees.length && (
-              <Text dimColor>+ {treeList.length - shownTrees.length} more, detached and clean</Text>
+            {hiddenTrees.length > 0 && (
+              <Text dimColor>
+                + {hiddenTrees.length} more, {hiddenNote}
+              </Text>
             )}
           </Box>
         </Box>

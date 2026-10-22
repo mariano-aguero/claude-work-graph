@@ -120,3 +120,38 @@ test('counts an agent tool calls, edited files and the PR it opened', async ($, 
   expect(await ui.find({ type: 'Text', text: /PR #42/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('main card follows the current worktree, hidden dirty trees are not called clean', async ($, on) => {
+  const trees = Array.from({ length: 10 }, (_, i) => `worktree /r/wt/b${i}\nHEAD ${i}\nbranch refs/heads/b${i}`)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('agent.list', () => ({ value: [] }))
+  on('process.run', ($, e) => {
+    const stdout = e.argv.includes('list') ? trees.join('\n\n') : e.argv.includes('rev-parse') ? '/r/wt/b9\n' : ' M a.ts\n'
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: [] } }))
+  await $.command.run({
+    command: 'work',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 160 },
+  })
+
+  const ui = await $.ui.mount({
+    plugin: 'work-graph',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'work-graph',
+    props: {
+      title: 'Work',
+      isFocused: true,
+      bodyColumns: 80,
+      placement: 'dock',
+      scroll: { offset: 0, bodyRows: 60 },
+      view: {},
+    },
+  })
+  expect(await ui.find({ type: 'Text', text: /^⑂ b9$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\+ 2 more, 2 with changes/ })).toBeDefined()
+  await ui.unmount()
+})
