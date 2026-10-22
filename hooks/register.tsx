@@ -216,6 +216,12 @@ function taskBadge(task: Task, byId: Map<string, Task>): Badge {
   return { text: '○ Ready', color: 'subtle', isQuiet: false }
 }
 
+// `plugin:agent` reads as the agent, then the plugin it comes from; built-in types have no plugin.
+function agentKind(type: string) {
+  const at = type.lastIndexOf(':')
+  return at === -1 ? [type] : [type.slice(at + 1), type.slice(0, at)]
+}
+
 function modelName(id: string | undefined) {
   const match = id?.match(/claude-([a-z]+)-(\d+)(?:-(\d+))?/)
   if (!match) return id
@@ -459,7 +465,7 @@ export const register: Register = on => {
 
     const agentLines = (agent: Agent, s: AgentStats | undefined): Line[] => {
       const lines: Line[] = [
-        { text: [modelName(s?.model), agent.type.replace(/^.*:/, '')].filter(Boolean).join(' · ') },
+        { text: [modelName(s?.model), ...agentKind(agent.type)].filter(Boolean).join(' · ') },
       ]
       if (agent.description !== agent.name) lines.push({ text: agent.description })
       lines.push(...activity(s, agent.status === 'running'), ...metrics(s))

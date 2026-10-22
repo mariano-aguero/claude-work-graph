@@ -9,7 +9,7 @@ A Claude Code mod that adds a **Work** pane: the agents of the session as an org
 **Agents.** A card for the main session, joined by connector lines to a card per agent, with subagents hanging under their parent. Each card has:
 
 - status: running, starting, needs you, idle, done, error, refused, stopped. An idle teammate shows how its last turn ended.
-- model and agent type
+- model, agent type and the plugin the agent comes from (`Opus 5.5 · poteto-agent · pstack`)
 - what it is doing now (`▸ Edit api.ts`), or the first line of its last answer
 - estimated cost, tokens, context in use, time spent, tool calls and files edited
 - the pull request it opened with `gh pr create`

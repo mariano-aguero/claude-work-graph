@@ -42,8 +42,8 @@ test('draws agents as cards under the main session, hides clean detached trees',
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('agent.list', () => ({
     value: [
-      { id: 'a1', name: 'flake-check', description: 'x', type: 'pstack:poteto-agent', status: 'running' },
-      { id: 'a2', name: 'lanes-1', description: 'x', type: 'pstack:poteto-agent', status: 'idle' },
+      { id: 'a1', name: 'scraper', description: 'x', type: 'acme:researcher', status: 'running' },
+      { id: 'a2', name: 'analyst', description: 'x', type: 'acme:researcher', status: 'idle' },
     ],
   }))
   on('process.run', ($, e) => {
@@ -73,9 +73,10 @@ test('draws agents as cards under the main session, hides clean detached trees',
       view: {},
     },
   })
-  expect(await ui.find({ type: 'Text', text: /flake-check/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /lanes-1/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /scraper/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /analyst/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Main session/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^researcher · acme$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /╭.*┴.*╮/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /\+ 1 more, detached and clean/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /wt\/old/ })).toBeUndefined()
