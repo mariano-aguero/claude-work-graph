@@ -34,7 +34,15 @@ From a shell:
 claude plugin install work-graph --marketplace mariano-aguero/claude-work-graph
 ```
 
+The first time, Claude Code asks to add the `mariano-aguero/claude-work-graph` marketplace. Answer `y`, then keep the user scope so the mod loads in every session you start. It runs in the current session right away, with no restart.
+
+In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `mariano-aguero/claude-work-graph`, then Add plugin. A mod installed from a terminal at the user scope also loads in the desktop app's local Code sessions, so either road works.
+
 The pane opens by itself when a session starts. `/work` opens it at any time. In a fullscreen terminal at least 110 columns wide it docks beside the transcript; otherwise it sits above the prompt.
+
+To check the install, `claude plugin list` should show `work-graph`, and `/work` should answer `Work pane opened.` If the pane stays empty or never shows, start a session with `claude --debug`: the mod's errors are logged on lines starting with `work-graph:`.
+
+To get a new version, run `claude plugin update work-graph`, then `/reload-plugins` in an open session. To remove it, `claude plugin uninstall work-graph`.
 
 ## Requirements
 
