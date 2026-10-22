@@ -379,8 +379,8 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: `mcp__work-graph__${STATUS_TOOL}` }, async $ => {
-    const status = await workStatus($)
-    return { result: status, text: JSON.stringify(status), isReadOnly: true }
+    const json = JSON.stringify(await workStatus($))
+    return { result: json, text: json, isReadOnly: true }
   })
 
   on('turn.step', async function* ($, e, next) {

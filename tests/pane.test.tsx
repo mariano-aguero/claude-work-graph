@@ -168,7 +168,8 @@ test('work_status gives the model agents, open blockers and worktrees', async ($
   })
 
   const ran = await $.tool.call({ tool: 'mcp__work-graph__work_status' })
-  const status = JSON.parse(ran.text!)
+  expect(typeof ran.result).toBe('string')
+  const status = JSON.parse(ran.result as string)
   expect(status.agents[0]).toMatchObject({ name: 'coder', status: 'running' })
   expect(status.tasks.find((t: { id: string }) => t.id === '2').waitingOn).toEqual(['1'])
   expect(status.worktrees.find((t: { branch: string }) => t.branch === 'feature').changedFiles).toBe(1)
