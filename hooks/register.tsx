@@ -146,8 +146,11 @@ async function refreshPullRequests($: EngineInterface) {
       checks: checksOf(pr.statusCheckRollup ?? []),
     })
   }
-  const before = new Map((await read($, worktrees)).map(t => [t.branch, t.pr]))
-  await update($, worktrees, list => list.map(t => ({ ...t, pr: byBranch.get(t.branch) })))
+  let before = new Map<string, PullRequest | undefined>()
+  await update($, worktrees, list => {
+    before = new Map(list.map(t => [t.branch, t.pr]))
+    return list.map(t => ({ ...t, pr: byBranch.get(t.branch) }))
+  })
 
   // Only a change seen between two polls alerts, so PRs already red at load stay quiet.
   for (const [branch, pr] of byBranch) {
@@ -189,8 +192,12 @@ async function refreshAgents($: EngineInterface) {
     parentId: a.parentId,
     branch: agentBranches.get(a.id),
   }))
-  const before = new Map((await read($, agents)).map(a => [a.id, a.status]))
-  await update($, agents, () => mapped)
+  // The prior list is taken inside the write, so overlapping refreshes see each other's.
+  let before = new Map<string, string>()
+  await update($, agents, list => {
+    before = new Map(list.map(a => [a.id, a.status]))
+    return mapped
+  })
 
   for (const agent of mapped) {
     if (agent.status === 'waiting' && before.get(agent.id) !== 'waiting') void alert($, `${agent.name} needs you`)

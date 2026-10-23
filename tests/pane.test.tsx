@@ -223,3 +223,39 @@ test('notifies when an open PR turns red, not when it was red already', async ($
   await $.command.run(WORK)
   expect(sent).toEqual(['#7 checks failing on feature'])
 })
+
+test('concurrent refreshes alert once', async ($, on) => {
+  let status = 'running'
+  const sent: string[] = []
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.notify', ($, e) => { sent.push(e.text); return { value: { isSent: true, channel: 'terminal_bell' } } })
+  on('agent.list', () => ({ value: [{ id: 'a1', name: 'coder', description: 'x', type: 'g', status }] }))
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: [] } }))
+  await $.command.run(WORK)
+  status = 'waiting'
+  await Promise.all([$.command.run(WORK), $.command.run(WORK), $.tool.call({ tool: 'mcp__work-graph__work_status' })])
+  expect(sent).toEqual(['coder needs you'])
+})
+
+test('a PR already red at load stays quiet, a closed one never alerts', async ($, on) => {
+  const sent: string[] = []
+  let feature = 'SUCCESS'
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.notify', ($, e) => { sent.push(e.text); return { value: { isSent: true, channel: 'terminal_bell' } } })
+  on('agent.list', () => ({ value: [] }))
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: [] } }))
+  const porcelain = 'worktree /r/main\nHEAD a\nbranch refs/heads/main\n\nworktree /r/wt/feature\nHEAD b\nbranch refs/heads/feature'
+  on('process.run', ($, e) => {
+    const prs = [
+      { headRefName: 'main', number: 1, url: 'u', state: 'OPEN', isDraft: false, statusCheckRollup: [{ conclusion: 'FAILURE' }] },
+      { headRefName: 'feature', number: 2, url: 'u', state: 'CLOSED', isDraft: false, statusCheckRollup: [{ conclusion: feature }] },
+    ]
+    const stdout = e.argv[0] === 'gh' ? JSON.stringify(prs) : e.argv.includes('list') ? porcelain : ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  await $.command.run(WORK)
+  await $.command.run(WORK)
+  feature = 'FAILURE'
+  await $.command.run(WORK)
+  expect(sent).toEqual([])
+})
