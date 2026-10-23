@@ -146,7 +146,23 @@ async function refreshPullRequests($: EngineInterface) {
       checks: checksOf(pr.statusCheckRollup ?? []),
     })
   }
+  const before = new Map((await read($, worktrees)).map(t => [t.branch, t.pr]))
   await update($, worktrees, list => list.map(t => ({ ...t, pr: byBranch.get(t.branch) })))
+
+  // Only a change seen between two polls alerts, so PRs already red at load stay quiet.
+  for (const [branch, pr] of byBranch) {
+    const was = before.get(branch)
+    if (pr.state === 'OPEN' && pr.checks === 'failing' && was && was.checks !== 'failing') {
+      void alert($, `#${pr.number} checks failing on ${branch}`)
+    }
+  }
+}
+
+// A native notification, or a toast where the session cannot raise one, as in
+// the desktop app. Notifications the person turned off stay off.
+async function alert($: EngineInterface, text: string) {
+  const sent = await $.ui.notify(text, { title: TITLE })
+  if (!sent.isSent && sent.reason !== 'disabled') $.ui.toast(text)
 }
 
 async function refreshSession($: EngineInterface) {
@@ -173,7 +189,12 @@ async function refreshAgents($: EngineInterface) {
     parentId: a.parentId,
     branch: agentBranches.get(a.id),
   }))
+  const before = new Map((await read($, agents)).map(a => [a.id, a.status]))
   await update($, agents, () => mapped)
+
+  for (const agent of mapped) {
+    if (agent.status === 'waiting' && before.get(agent.id) !== 'waiting') void alert($, `${agent.name} needs you`)
+  }
 }
 
 function refreshAll($: EngineInterface) {

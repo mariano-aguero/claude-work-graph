@@ -174,3 +174,52 @@ test('work_status gives the model agents, open blockers and worktrees', async ($
   expect(status.tasks.find((t: { id: string }) => t.id === '2').waitingOn).toEqual(['1'])
   expect(status.worktrees.find((t: { branch: string }) => t.branch === 'feature').changedFiles).toBe(1)
 })
+
+const WORK = {
+  command: 'work',
+  args: '',
+  origin: { kind: 'composer' },
+  presentation: { isFullscreen: true, columns: 160 },
+} as const
+
+test('notifies once when an agent starts waiting on the person', async ($, on) => {
+  let status = 'running'
+  const sent: string[] = []
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.notify', ($, e) => {
+    sent.push(e.text)
+    return { value: { isSent: true, channel: 'terminal_bell' } }
+  })
+  on('agent.list', () => ({ value: [{ id: 'a1', name: 'coder', description: 'x', type: 'general-purpose', status }] }))
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: [] } }))
+
+  await $.command.run(WORK)
+  status = 'waiting'
+  await $.command.run(WORK)
+  await $.command.run(WORK)
+  expect(sent).toEqual(['coder needs you'])
+})
+
+test('notifies when an open PR turns red, not when it was red already', async ($, on) => {
+  let conclusion = 'SUCCESS'
+  const sent: string[] = []
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.notify', ($, e) => {
+    sent.push(e.text)
+    return { value: { isSent: true, channel: 'terminal_bell' } }
+  })
+  on('agent.list', () => ({ value: [] }))
+  on('tool.call', { tool: 'TaskList' }, () => ({ result: { tasks: [] } }))
+  on('process.run', ($, e) => {
+    const pr = { headRefName: 'feature', number: 7, url: 'u', state: 'OPEN', isDraft: false, statusCheckRollup: [{ conclusion }] }
+    const stdout = e.argv[0] === 'gh' ? JSON.stringify([pr]) : e.argv.includes('list') ? PORCELAIN : ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+
+  await $.command.run(WORK)
+  await $.command.run(WORK)
+  conclusion = 'FAILURE'
+  await $.command.run(WORK)
+  await $.command.run(WORK)
+  expect(sent).toEqual(['#7 checks failing on feature'])
+})
