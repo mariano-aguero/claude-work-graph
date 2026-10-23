@@ -1,1 +1,1 @@
-{ "name": "work-graph", "version": "0.2.0", "description": "Pane with linked tasks, their blockers and status, agents and git worktrees", "types": "./types/index.d.ts" }
+{ "name": "work-graph", "version": "0.3.0", "description": "Pane with linked tasks, their blockers and status, agents and git worktrees", "types": "./types/index.d.ts" }
